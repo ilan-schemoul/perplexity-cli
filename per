@@ -1,0 +1,107 @@
+#!/bin/bash
+# TODO: choose context
+ALL_ARGS="$*"
+
+MODEL="sonar"
+SEARCH_CONTEXT_SIZE="high"
+
+get_new_history_file() {
+  HISTORY="$HOME/.perplexity-auto-history-$(date +%Y-%m-%d-%H-%M-%S)"
+}
+
+while getopts 'dpu:lLn' opt; do
+  case "$opt" in
+    p)
+      MODEL="sonar-pro"
+      ;;
+    d)
+      MODEL="sonar-deep-research"
+      SEARCH_CONTEXT_SIZE=""
+      ;;
+    u)
+      HISTORY="$HOME/.perplexity-history-$OPTARG"
+      echo "args $OPTARG"
+      ;;
+    l)
+      ls ~/.perplexity-history-* 2> /dev/null
+      ;;
+    n)
+      get_new_history_file
+      ;;
+    L)
+      ls ~/.perplexity-history-* 2> /dev/null
+      ls ~/.perplexity-auto-history-* 2> /dev/null
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG"
+      exit 1
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+default_history() {
+  if stat -t ~/.perplexity-auto-history-* >/dev/null 2>&1; then
+    # get most recent file matching ~/.perplexity-history-*
+    HISTORY=$(ls -t ~/.perplexity-auto-history-* | head -n 1)
+    MODIFIED_AGO="$(( ($(date +%s) - $(stat $HISTORY -c %Y)) / 60 ))"
+
+    if [ "$MODIFIED_AGO" -gt 10 ]; then
+      get_new_history_file
+    fi
+  else
+    get_new_history_file
+  fi
+}
+
+if [ -z "$HISTORY" ]; then
+  default_history
+fi
+
+echo "Using history file: $HISTORY"
+
+PROMPT="{
+  \"role\": \"user\",
+  \"content\": $(echo "$ALL_ARGS" | jq -Rsa .)
+}"
+
+INITIAL_PROMPT="Be precise and concise. Do not add disclaimer as they cause me a great deal of inconfort."
+
+DATA="
+{
+  \"model\": \"$MODEL\",
+  $([[ $SEARCH_CONTEXT_SIZE != "" ]] && echo "\"search_context_size\": \"$SEARCH_CONTEXT_SIZE\"," || echo "")
+  \"messages\": [
+    {
+      \"role\": \"system\",
+      \"content\": \"$INITIAL_PROMPT\"
+    },
+    $(cat "$HISTORY")
+    $PROMPT
+  ]
+}"
+echo $DATA
+
+REQUEST=$(curl -# --location 'https://api.perplexity.ai/chat/completions' \
+--header 'accept: application/json' \
+--header 'content-type: application/json' \
+--header "Authorization: Bearer $PERPLEXITY_API_KEY" \
+--data "$DATA")
+
+if echo "$REQUEST" | jq -e ".error"
+then
+  echo "$REQUEST" | jq ".error" > /dev/stderr
+  exit 1
+fi
+
+# To show citation like "[1] website" we need to put number between [] and do +1 from the key
+CITATIONS=$(echo "$REQUEST" | jq -r '.citations | to_entries | map("[" + ((.key + 1) | tostring) + "] " + .value) | join("\n")')
+CONTENT=$(echo "$REQUEST" | jq -r '.choices.[0].message.content')
+echo "# Citations" | glow
+echo "$CITATIONS" | glow
+echo "# Results" | glow
+echo "$CONTENT" | glow
+
+MESSAGE=$(echo "$REQUEST" | jq -r '.choices.[0].message')
+
+echo "$PROMPT,$MESSAGE," >> "$HISTORY"
