@@ -9,7 +9,7 @@ get_new_history_file() {
   HISTORY="$HOME/.perplexity-auto-history-$(date +%Y-%m-%d-%H-%M-%S)"
 }
 
-while getopts 'dpu:lLn' opt; do
+while getopts 'dpu:lLnrR' opt; do
   case "$opt" in
     p)
       MODEL="sonar-pro"
@@ -17,6 +17,12 @@ while getopts 'dpu:lLn' opt; do
     d)
       MODEL="sonar-deep-research"
       SEARCH_CONTEXT_SIZE=""
+      ;;
+    r)
+      MODEL="sonar-reasoning"
+      ;;
+    R)
+      MODEL="sonar-reasoning-pro"
       ;;
     u)
       HISTORY="$HOME/.perplexity-history-$OPTARG"
@@ -98,9 +104,11 @@ fi
 CITATIONS=$(echo "$REQUEST" | jq -r '.citations | to_entries | map("[" + ((.key + 1) | tostring) + "] " + .value) | join("\n")')
 CONTENT=$(echo "$REQUEST" | jq -r '.choices.[0].message.content')
 echo "# Citations" | glow
-echo "$CITATIONS" | glow
+# Disable width wrapping
+echo "$CITATIONS" | glow --width 0
 echo "# Results" | glow
-echo "$CONTENT" | glow
+# Disable width wrapping
+echo "$CONTENT" | glow --width 0
 
 MESSAGE=$(echo "$REQUEST" | jq -r '.choices.[0].message')
 
