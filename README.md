@@ -14,24 +14,28 @@ Default model is sonar (see Options section to modify model).
 Default context size is medium (see Options section to modify context size).
 
 ## Options
-
+### Perplexity Models
 - `-p` - Use the "sonar-pro" model (default model is "sonar")
 - `-d` - Use the "sonar-deep-research" model (removes search context size parameter)
 - `-r` - Use the "sonar-reasoning" model
 - `-R` - Use the "sonar-reasoning-pro" model
+### Claude AI
+- `-c [VERSION]` - Use Claude AI instead of Perplexity (3.5 for Claude 3.5 Haiku, if left empty, defaults to Claude 3.7 Sonnet)
+### History
 - `-u [NAME]` - Use a specific named history file (stored at ~/.perplexity-history-[NAME])
 - `-s` - Select a history file using interactive filter
 - `-n` - Create a new history file
 - `-l` - List all perplexity history files (only user-generated ones)
 - `-L` - List all perplexity history files (including auto-generated ones)
+### Context Size
 - `-h` - Set context size to high
 
 ## History Management
 
-Use most recent history file if you ask a question less than 10mn after the last question. If more
-than 10mn has elapsed since the last question we start afresh with new history file.
+We use the most recent history file if you ask a question within 10 minutes of the last question.
+Otherwise, we create a new history file.
 
-See section #Options above to specify manually history files.
+You can use options `-u`, `-s`, and `-n` to manage history files.
 
 ## Examples
 
@@ -63,4 +67,9 @@ per -u research "What are the ethical implications?"
 Deep research mode:
 ```bash
 per -d "What are the long-term effects of climate change?"
+```
+
+Use Claude AI instead of Perplexity:
+```bash
+per -c 3.5 "What is the difference between transformers and RNNs?"
 ```
