@@ -1,7 +1,8 @@
 ## Dependencies
 
-- `jq` - For JSON processing
+- `jq`   - For JSON processing
 - `glow` - For terminal markdown rendering
+- `gum`  - For terminal UI components
 
 ## Usage
 
@@ -9,16 +10,21 @@
 per [options] "your question or prompt here"
 ```
 
-Currently it only ever use "high" for the parameter context size.
 Default model is sonar (see Options section to modify model).
+Default context size is medium (see Options section to modify context size).
 
 ## Options
 
 - `-p` - Use the "sonar-pro" model (default model is "sonar")
-- `-d` - Use the "sonar-deep-research" model with expanded context
+- `-d` - Use the "sonar-deep-research" model (removes search context size parameter)
+- `-r` - Use the "sonar-reasoning" model
+- `-R` - Use the "sonar-reasoning-pro" model
 - `-u [NAME]` - Use a specific named history file (stored at ~/.perplexity-history-[NAME])
-- `-l` - List all perplexity history files
+- `-s` - Select a history file using interactive filter
+- `-n` - Create a new history file
+- `-l` - List all perplexity history files (only user-generated ones)
 - `-L` - List all perplexity history files (including auto-generated ones)
+- `-h` - Set context size to high
 
 ## History Management
 

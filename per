@@ -3,14 +3,17 @@
 ALL_ARGS="$*"
 
 MODEL="sonar"
-SEARCH_CONTEXT_SIZE="high"
+SEARCH_CONTEXT_SIZE="medium"
 
 get_new_history_file() {
   HISTORY="$HOME/.perplexity-auto-history-$(date +%Y-%m-%d-%H-%M-%S)"
 }
 
-while getopts 'dpu:lLnrR' opt; do
+while getopts 'hdpu:lLnrRs' opt; do
   case "$opt" in
+    h)
+      SEARCH_CONTEXT_SIZE="high"
+      ;;
     p)
       MODEL="sonar-pro"
       ;;
@@ -26,7 +29,13 @@ while getopts 'dpu:lLnrR' opt; do
       ;;
     u)
       HISTORY="$HOME/.perplexity-history-$OPTARG"
-      echo "args $OPTARG"
+      ;;
+    s)
+      HISTORY=$(ls ~/.perplexity-history-* | gum filter)
+      if [ -z "$HISTORY" ]; then
+        echo "No history file selected"
+        exit 1
+      fi
       ;;
     l)
       ls ~/.perplexity-history-* 2> /dev/null
@@ -39,7 +48,7 @@ while getopts 'dpu:lLnrR' opt; do
       ls ~/.perplexity-auto-history-* 2> /dev/null
       ;;
     \?)
-      echo "Invalid option: -$OPTARG"
+      gum format "Invalid option: -$OPTARG"
       exit 1
       ;;
   esac
@@ -64,11 +73,12 @@ if [ -z "$HISTORY" ]; then
   default_history
 fi
 
-echo "Using history file: $HISTORY"
+gum format "Using history file: $HISTORY"
+touch "$HISTORY"
 
 PROMPT="{
   \"role\": \"user\",
-  \"content\": $(echo "$ALL_ARGS" | jq -Rsa .)
+  \"content\": \"$@\"
 }"
 
 INITIAL_PROMPT="Be precise and concise. Do not add disclaimer as they cause me a great deal of inconfort."
@@ -86,9 +96,8 @@ DATA="
     $PROMPT
   ]
 }"
-echo $DATA
 
-REQUEST=$(curl -# --location 'https://api.perplexity.ai/chat/completions' \
+REQUEST=$(gum spin --spinner dot --title "Perplexity is thinking..." -- curl --silent --location 'https://api.perplexity.ai/chat/completions' \
 --header 'accept: application/json' \
 --header 'content-type: application/json' \
 --header "Authorization: Bearer $PERPLEXITY_API_KEY" \
