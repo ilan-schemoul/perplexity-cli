@@ -12,7 +12,7 @@ get_new_history_file() {
   HISTORY="$HOME/.perplexity-auto-history-$(date +%Y-%m-%d-%H-%M-%S)"
 }
 
-while getopts 'hdpu:lLnrRsc:' opt; do
+while getopts 'orhdpu:lLnrRsc:v' opt; do
   case "$opt" in
     c)
       BASE_URL="https://api.anthropic.com/v1"
@@ -63,6 +63,12 @@ while getopts 'hdpu:lLnrRsc:' opt; do
       ls ~/.perplexity-history-* 2> /dev/null
       ls ~/.perplexity-auto-history-* 2> /dev/null
       ;;
+    v)
+      VOICE="true"
+      ;;
+    o)
+      READ="true"
+      ;;
     \?)
       gum format "Invalid option: -$OPTARG"
       exit 1
@@ -85,6 +91,10 @@ default_history() {
   fi
 }
 
+load() {
+  gum spin --spinner dot --title "$AI is thinking..." -- curl "$@"
+}
+
 if [ -z "$HISTORY" ]; then
   default_history
 fi
@@ -92,12 +102,26 @@ fi
 gum format "Using history file: $HISTORY"
 touch "$HISTORY"
 
+CONTENT=$(echo "$@" | jq -Rsa .)
+
+if [ -n "$VOICE" ]; then
+  arecord -f dat voice.wav >/dev/null 2>&1
+  RES=$(load --silent https://api.openai.com/v1/audio/transcriptions \
+    -H "Authorization: Bearer $OPENAI_API_KEY" \
+    -H "Content-Type: multipart/form-data" \
+    -F file="@voice.wav" \
+    -F model="whisper-1")
+  CONTENT=$(echo "$RES" | jq -r ".text")
+  echo "You said: $CONTENT"
+fi
+
 PROMPT="{
   \"role\": \"user\",
-  \"content\": \"$@\"
+  \"content\": $CONTENT
 }"
 
 INITIAL_PROMPT="Be precise and concise. Do not add disclaimer as they cause me a great deal of inconfort."
+echo "$PROMPT"
 
 DATA="
 {
@@ -113,11 +137,11 @@ DATA="
   ]
 }"
 
-RESPONSE=$(gum spin --spinner dot --title "$AI is thinking..." -- curl --silent --location "$BASE_URL/chat/completions" \
---header 'accept: application/json' \
---header 'content-type: application/json' \
---header "Authorization: Bearer $API_KEY" \
---data "$DATA")
+RESPONSE=$(load --silent --location "$BASE_URL/chat/completions" \
+                --header 'accept: application/json' \
+                --header 'content-type: application/json' \
+                --header "Authorization: Bearer $API_KEY" \
+                --data "$DATA")
 
 if echo "$RESPONSE" | jq -e ".error"> /dev/null 2>&1;
 then
@@ -140,5 +164,24 @@ echo "# Results" | glow
 echo "$CONTENT" | glow --width 0
 
 MESSAGE=$(echo "$RESPONSE" | jq -r '.choices.[0].message')
+
+if [ -n "$READ" ]; then
+  CONTENT_SINGLE_LINE=$(echo "$CONTENT" | tr '\n' ' ')
+  DATA='
+    {
+      "model": "gpt-4o-mini-tts",
+      "input": "'"$CONTENT_SINGLE_LINE"'",
+      "voice": "nova"
+    }
+  '
+
+  load --location "https://api.openai.com/v1/audio/speech" \
+      --header "Authorization: Bearer $OPENAI_API_KEY" \
+      --header "Content-Type: application/json" \
+      --data "$DATA" --output /tmp/speech.mp3
+
+  mpg123 -q /tmp/speech.mp3
+  mv /tmp/speech.mp3 /tmp/old-speech.mp3
+fi
 
 echo "$PROMPT,$MESSAGE," >> "$HISTORY"
